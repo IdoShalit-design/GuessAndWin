@@ -17,6 +17,34 @@ function MathFormula({ expr, displayMode = false, style = {} }) {
     );
 }
 
+function SliderWithNumber({ min = 0, max = 100, step = 1, value, onChange }) {
+    return (
+        <>
+            <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={value}
+                onChange={(e) => onChange(Number(e.target.value))}
+            />
+            <input
+                type="number"
+                className="slider-number"
+                min={min}
+                max={max}
+                step={step}
+                value={value}
+                onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (!Number.isNaN(v)) onChange(v);
+                }}
+            />
+            <span className="slider-percent">%</span>
+        </>
+    );
+}
+
 function factorial(n) {
     if (n === 0 || n === 1) return 1;
     let res = 1;
@@ -155,22 +183,19 @@ function SimulatorApp() {
                         <div className="form-group">
                             <label>ניצחון קבוצה א' (מארחת):</label>
                             <div className="slider-container">
-                                <input type="range" min="5" max="90" value={rawWinA} onChange={(e) => setRawWinA(Number(e.target.value))} />
-                                <span className="slider-val">{rawWinA}%</span>
+                                <SliderWithNumber min={5} max={90} value={rawWinA} onChange={(v) => setRawWinA(v)} />
                             </div>
                         </div>
                         <div className="form-group">
                             <label>תיקו:</label>
                             <div className="slider-container">
-                                <input type="range" min="5" max="90" value={rawDraw} onChange={(e) => setRawDraw(Number(e.target.value))} />
-                                <span className="slider-val">{rawDraw}%</span>
+                                <SliderWithNumber min={5} max={90} value={rawDraw} onChange={(v) => setRawDraw(v)} />
                             </div>
                         </div>
                         <div className="form-group">
                             <label>ניצחון קבוצה ב' (אורחת):</label>
                             <div className="slider-container">
-                                <input type="range" min="5" max="90" value={rawWinB} onChange={(e) => setRawWinB(Number(e.target.value))} />
-                                <span className="slider-val">{rawWinB}%</span>
+                                <SliderWithNumber min={5} max={90} value={rawWinB} onChange={(v) => setRawWinB(v)} />
                             </div>
                         </div>
                         <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', margin: '5px 0 0 0'}}>
@@ -186,8 +211,7 @@ function SimulatorApp() {
                         <div className="form-group" style={{marginBottom: mode === 'poisson' ? '15px' : '5px'}}>
                             <label>Over 0.5:</label>
                             <div className="slider-container">
-                                <input type="range" min="5" max="99" value={pOver05A} onChange={(e) => setPOver05A(Number(e.target.value))} />
-                                <span className="slider-val">{pOver05A}%</span>
+                                <SliderWithNumber min={5} max={99} value={pOver05A} onChange={(v) => setPOver05A(v)} />
                             </div>
                             {mode === 'poisson' && <small style={{color: 'var(--text-muted)'}}>&lambda; צפוי: {lambdaA.toFixed(3)} שערים</small>}
                         </div>
@@ -196,15 +220,13 @@ function SimulatorApp() {
                                 <div className="form-group" style={{marginBottom: '5px'}}>
                                     <label>Over 1.5:</label>
                                     <div className="slider-container">
-                                        <input type="range" min="1" max="99" value={pOver15A} onChange={(e) => setPOver15A(Number(e.target.value))} />
-                                        <span className="slider-val">{pOver15A}%</span>
+                                        <SliderWithNumber min={1} max={99} value={pOver15A} onChange={(v) => setPOver15A(v)} />
                                     </div>
                                 </div>
                                 <div className="form-group">
                                     <label>Over 2.5:</label>
                                     <div className="slider-container">
-                                        <input type="range" min="0" max="80" value={pOver25A} onChange={(e) => setPOver25A(Number(e.target.value))} />
-                                        <span className="slider-val">{pOver25A}%</span>
+                                        <SliderWithNumber min={0} max={80} value={pOver25A} onChange={(v) => setPOver25A(v)} />
                                     </div>
                                 </div>
                             </>
@@ -214,8 +236,7 @@ function SimulatorApp() {
                         <div className="form-group" style={{marginBottom: mode === 'poisson' ? '15px' : '5px'}}>
                             <label>Over 0.5:</label>
                             <div className="slider-container">
-                                <input type="range" min="5" max="99" value={pOver05B} onChange={(e) => setPOver05B(Number(e.target.value))} />
-                                <span className="slider-val">{pOver05B}%</span>
+                                <SliderWithNumber min={5} max={99} value={pOver05B} onChange={(v) => setPOver05B(v)} />
                             </div>
                             {mode === 'poisson' && <small style={{color: 'var(--text-muted)'}}>&lambda; צפוי: {lambdaB.toFixed(3)} שערים</small>}
                         </div>
@@ -224,15 +245,13 @@ function SimulatorApp() {
                                 <div className="form-group" style={{marginBottom: '5px'}}>
                                     <label>Over 1.5:</label>
                                     <div className="slider-container">
-                                        <input type="range" min="1" max="99" value={pOver15B} onChange={(e) => setPOver15B(Number(e.target.value))} />
-                                        <span className="slider-val">{pOver15B}%</span>
+                                        <SliderWithNumber min={1} max={99} value={pOver15B} onChange={(v) => setPOver15B(v)} />
                                     </div>
                                 </div>
                                 <div className="form-group">
                                     <label>Over 2.5:</label>
                                     <div className="slider-container">
-                                        <input type="range" min="0" max="80" value={pOver25B} onChange={(e) => setPOver25B(Number(e.target.value))} />
-                                        <span className="slider-val">{pOver25B}%</span>
+                                        <SliderWithNumber min={0} max={80} value={pOver25B} onChange={(v) => setPOver25B(v)} />
                                     </div>
                                 </div>
                             </>
