@@ -89,6 +89,17 @@ function SimulatorApp() {
     const lambdaA = -Math.log(1 - (pOver05A / 100));
     const lambdaB = -Math.log(1 - (pOver05B / 100));
 
+    // סיכום קלטים לטקסט שניתן להעתיק
+    const summaryText = [
+        `Model: ${mode}`,
+        `Raw 1X2: A=${rawWinA}% | Draw=${rawDraw}% | B=${rawWinB}%`,
+        `Normalized 1X2: A=${(normWinA*100).toFixed(2)}% | Draw=${(normDraw*100).toFixed(2)}% | B=${(normWinB*100).toFixed(2)}%`,
+        `Team A Overs: O0.5=${pOver05A}%${mode === 'empirical' ? ` | O1.5=${pOver15A}% | O2.5=${pOver25A}%` : ''}`,
+        `Team B Overs: O0.5=${pOver05B}%${mode === 'empirical' ? ` | O1.5=${pOver15B}% | O2.5=${pOver25B}%` : ''}`,
+        `Points: outcome=${ptsOutcome} | exact=${ptsScore}`,
+        `Lambda (A) = ${lambdaA.toFixed(3)} | Lambda (B) = ${lambdaB.toFixed(3)}`
+    ].join('\n');
+
     // חישובי שוק אמפירי - הבטחת תקינות מתמטית (O0.5 >= O1.5 >= O2.5)
     const emp05A = pOver05A / 100;
     const emp15A = Math.min(pOver15A / 100, emp05A);
@@ -268,6 +279,16 @@ function SimulatorApp() {
                             <div>
                                 <label>נקודות על תוצאה מדויקת:</label>
                                 <input type="number" className="points-input" value={ptsScore} onChange={(e) => setPtsScore(Number(e.target.value))} />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="card">
+                        <h2>סיכום קלטים (להעתקה)</h2>
+                        <div className="form-group">
+                            <label>העתק את כל הקלטים כאן:</label>
+                            <textarea className="summary-textarea" readOnly rows={8} value={summaryText} />
+                            <div style={{marginTop: '8px'}}>
+                                <button className="copy-btn" onClick={() => navigator.clipboard && navigator.clipboard.writeText(summaryText)}>העתק</button>
                             </div>
                         </div>
                     </div>
