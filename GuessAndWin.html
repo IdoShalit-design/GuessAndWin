@@ -116,7 +116,6 @@
             font-weight: bold;
         }
 
-        /* Distribution Charts Styles */
         .dist-row {
             display: flex;
             align-items: center;
@@ -129,7 +128,6 @@
         .dist-bar-fill.team-b { background-color: #f59e0b; }
         .dist-pct { position: absolute; left: 10px; top: 5px; font-size: 0.85rem; font-weight: bold; color: var(--text); font-variant-numeric: tabular-nums; }
 
-        /* Table Styles */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -163,6 +161,37 @@
             font-size: 0.75rem;
             margin-right: 8px;
             display: inline-block;
+        }
+
+        /* Toggle Button Styling Additions */
+        .model-toggle {
+            display: flex;
+            gap: 10px;
+            background: #f1f5f9;
+            padding: 5px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .model-toggle label {
+            flex: 1;
+            text-align: center;
+            margin: 0;
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+        .model-toggle input[type="radio"] { display: none; }
+        .model-toggle input[type="radio"]:checked + span {
+            background: var(--primary);
+            color: white;
+            display: block;
+            border-radius: 6px;
+            padding: 8px;
+        }
+        .model-toggle span {
+            display: block;
+            padding: 8px;
         }
     </style>
 </head>
