@@ -60,6 +60,9 @@ function SimulatorApp() {
     // מודל: 'poisson' או 'empirical'
     const [mode, setMode] = useState('poisson'); 
 
+    // הרחבה/כיווץ סדרתים
+    const [expandOutcomeProbs, setExpandOutcomeProbs] = useState(false);
+
     // שווקי שערים - קבוצה א
     const [pOver05A, setPOver05A] = useState(80);
     const [pOver15A, setPOver15A] = useState(45);
@@ -74,6 +77,10 @@ function SimulatorApp() {
     const [rawWinA, setRawWinA] = useState(54);
     const [rawDraw, setRawDraw] = useState(28);
     const [rawWinB, setRawWinB] = useState(21);
+
+    // שמות קבוצות
+    const [teamNameA, setTeamNameA] = useState('קבוצה א');
+    const [teamNameB, setTeamNameB] = useState('קבוצה ב');
 
     // ניקוד
     const [ptsOutcome, setPtsOutcome] = useState(1);
@@ -187,12 +194,36 @@ function SimulatorApp() {
                         <p style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>
                             {mode === 'poisson' ? "מודל מתמטי נאיבי המחשב התפלגות מלאה בהתבסס על שוק ה-Over 0.5 בלבד." : "מודל חכם הנשען על חכמת ההמונים (כסף אמיתי) בשווקי ה-Over המרובים."}
                         </p>
+                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px'}}>
+                            <div>
+                                <label style={{fontSize: '0.9rem', marginBottom: '6px', display: 'block'}}>שם {teamNameA === 'קבוצה א' ? 'קבוצה א\'' : 'קבוצה א'}:</label>
+                                <input
+                                    type="text"
+                                    className="points-input"
+                                    value={teamNameA}
+                                    onChange={(e) => setTeamNameA(e.target.value)}
+                                    placeholder="קבוצה א"
+                                    style={{fontSize: '0.9rem', padding: '6px 8px'}}
+                                />
+                            </div>
+                            <div>
+                                <label style={{fontSize: '0.9rem', marginBottom: '6px', display: 'block'}}>שם {teamNameB === 'קבוצה ב' ? 'קבוצה ב\'' : 'קבוצה ב'}:</label>
+                                <input
+                                    type="text"
+                                    className="points-input"
+                                    value={teamNameB}
+                                    onChange={(e) => setTeamNameB(e.target.value)}
+                                    placeholder="קבוצה ב"
+                                    style={{fontSize: '0.9rem', padding: '6px 8px'}}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     <div className="card form-group">
                         <h2>שוק ה-1X2 (Moneyline) %</h2>
                         <div className="form-group">
-                            <label>ניצחון קבוצה א' (מארחת):</label>
+                            <label>ניצחון {teamNameA} (מארחת):</label>
                             <div className="slider-container">
                                 <SliderWithNumber min={5} max={90} value={rawWinA} onChange={(v) => setRawWinA(v)} />
                             </div>
@@ -204,13 +235,13 @@ function SimulatorApp() {
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>ניצחון קבוצה ב' (אורחת):</label>
+                            <label>ניצחון {teamNameB} (אורחת):</label>
                             <div className="slider-container">
                                 <SliderWithNumber min={5} max={90} value={rawWinB} onChange={(v) => setRawWinB(v)} />
                             </div>
                         </div>
                         <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', margin: '5px 0 0 0'}}>
-                            הסתברויות מנורמלות: קבוצה א': {(normWinA*100).toFixed(1)}% | תיקו: {(normDraw*100).toFixed(1)}% | קבוצה ב': {(normWinB*100).toFixed(1)}%
+                            הסתברויות מנורמלות: {teamNameA}: {(normWinA*100).toFixed(1)}% | תיקו: {(normDraw*100).toFixed(1)}% | {teamNameB}: {(normWinB*100).toFixed(1)}%
                         </p>
                     </div>
 
@@ -218,7 +249,7 @@ function SimulatorApp() {
                     <div className="card form-group">
                         <h2>שוק השערים (Totals)</h2>
                         
-                        <h3 style={{fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '5px'}}>קבוצה א'</h3>
+                        <h3 style={{fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '5px'}}>{teamNameA}</h3>
                         <div className="form-group" style={{marginBottom: mode === 'poisson' ? '15px' : '5px'}}>
                             <label>Over 0.5:</label>
                             <div className="slider-container">
@@ -243,7 +274,7 @@ function SimulatorApp() {
                             </>
                         )}
 
-                        <h3 style={{fontSize: '1.1rem', color: '#f59e0b', marginBottom: '5px', marginTop: '20px'}}>קבוצה ב'</h3>
+                        <h3 style={{fontSize: '1.1rem', color: '#f59e0b', marginBottom: '5px', marginTop: '20px'}}>{teamNameB}</h3>
                         <div className="form-group" style={{marginBottom: mode === 'poisson' ? '15px' : '5px'}}>
                             <label>Over 0.5:</label>
                             <div className="slider-container">
@@ -310,7 +341,7 @@ function SimulatorApp() {
                             </p>
                         )}
 
-                        <h3>קבוצה א' (מארחת)</h3>
+                        <h3>{teamNameA} (מארחת)</h3>
                         {distA.slice(0, currentMaxGoals + 1).map((p, idx) => {
                             const isMax = (mode === 'empirical' && idx === currentMaxGoals);
                             const label = isMax ? '3+' : idx;
@@ -337,7 +368,7 @@ function SimulatorApp() {
                             );
                         })}
 
-                        <h3 style={{marginTop: '25px'}}>קבוצה ב' (אורחת)</h3>
+                        <h3 style={{marginTop: '25px'}}>{teamNameB} (אורחת)</h3>
                         {distB.slice(0, currentMaxGoals + 1).map((p, idx) => {
                             const isMax = (mode === 'empirical' && idx === currentMaxGoals);
                             const label = isMax ? '3+' : idx;
@@ -363,6 +394,90 @@ function SimulatorApp() {
                                 </div>
                             );
                         })}
+                    </div>
+
+                    <div className="card">
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expandOutcomeProbs ? '15px' : '10px'}}>
+                            <h2 style={{margin: 0, flex: 1}}>הסתברויות לתוצאות (Outcome Probabilities)</h2>
+                            <button 
+                                onClick={() => setExpandOutcomeProbs(!expandOutcomeProbs)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: '1.5rem',
+                                    padding: '0 10px',
+                                    color: 'var(--text-muted)',
+                                    transition: 'transform 0.2s'
+                                }}
+                            >
+                                {expandOutcomeProbs ? '▼' : '▶'}
+                            </button>
+                        </div>
+
+                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: expandOutcomeProbs ? '25px' : '0'}}>
+                            <div style={{padding: '15px', backgroundColor: '#f0f4ff', borderRadius: '8px', border: '1px solid #bfdbfe'}}>
+                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#1e40af', marginBottom: '5px'}}>ניצחון {teamNameA}</div>
+                                <div style={{fontSize: '1.3rem', fontWeight: '700', color: '#1e40af', fontVariantNumeric: 'tabular-nums'}}>
+                                    {(normWinA * 100).toFixed(2)}%
+                                </div>
+                            </div>
+                            <div style={{padding: '15px', backgroundColor: '#fef3f2', borderRadius: '8px', border: '1px solid #fecaca'}}>
+                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#b91c1c', marginBottom: '5px'}}>תיקו</div>
+                                <div style={{fontSize: '1.3rem', fontWeight: '700', color: '#b91c1c', fontVariantNumeric: 'tabular-nums'}}>
+                                    {(normDraw * 100).toFixed(2)}%
+                                </div>
+                            </div>
+                            <div style={{padding: '15px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0'}}>
+                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#15803d', marginBottom: '5px'}}>ניצחון {teamNameB}</div>
+                                <div style={{fontSize: '1.3rem', fontWeight: '700', color: '#15803d', fontVariantNumeric: 'tabular-nums'}}>
+                                    {(normWinB * 100).toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+
+                        {expandOutcomeProbs && (
+                            <>
+                                <div style={{fontSize: '0.9rem', fontWeight: '600', marginBottom: '10px', color: '#0f172a'}}>הסתברויות לכל תוצאה אפשרית:</div>
+                                <table style={{width: '100%', fontSize: '0.85rem', textAlign: 'right'}}>
+                                    <thead>
+                                        <tr style={{backgroundColor: '#f1f5f9', borderBottom: '2px solid var(--border)'}}>
+                                            <th style={{padding: '10px', fontWeight: '700', color: '#334155'}}>תוצאה (א' - ב')</th>
+                                            <th style={{padding: '10px', fontWeight: '700', color: '#334155'}}>הסתברות</th>
+                                            <th style={{padding: '10px', fontWeight: '700', color: '#334155'}}>תוצאה</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {resultsMatrix.map((row, index) => {
+                                            const parts = row.score.split(' - ');
+                                            const goalsA = parseInt(parts[0]);
+                                            const goalsB = parseInt(parts[1]);
+                                            let outcomeType = 'תיקו';
+                                            let outcomeColor = '#b91c1c';
+                                            if (goalsA > goalsB) {
+                                                outcomeType = 'ניצחון א\'';
+                                                outcomeColor = '#1e40af';
+                                            } else if (goalsB > goalsA) {
+                                                outcomeType = 'ניצחון ב\'';
+                                                outcomeColor = '#15803d';
+                                            }
+                                            return (
+                                                <tr key={index} style={{borderBottom: '1px solid var(--border)'}}>
+                                                    <td style={{padding: '10px'}}>{row.score}</td>
+                                                    <td style={{padding: '10px', fontVariantNumeric: 'tabular-nums'}}>
+                                                        {(row.pExact * 100).toFixed(3)}%
+                                                        <div dir="ltr" style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', textAlign: 'left'}}>
+                                                            <MathFormula expr={`P(${goalsA},${goalsB}) = P(${goalsA}) \\times P(${goalsB})`} />
+                                                        </div>
+                                                    </td>
+                                                    <td style={{padding: '10px', color: outcomeColor, fontWeight: '600'}}>{outcomeType}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </>
+                        )}
                     </div>
 
                     <div className="card">
