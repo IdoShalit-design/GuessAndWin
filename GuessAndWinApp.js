@@ -553,6 +553,40 @@ function SimulatorApp() {
 
                 {/* עמודה שמאלית: תוצאות ואנליטיקה */}
                 <div className="space-y">
+                    <div className="card">
+                        <h2>דירוג תוחלת ערך (EV Optimization)</h2>
+                        <div style={{fontSize: '0.95rem', color: 'var(--text-muted)', marginTop: '0'}}>
+                            <MathFormula expr={"EV = P(exact) \\times exactPoints + (P(direction) - P(exact)) \\times outcomePoints"} />
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>תוצאה ({teamNameA} - {teamNameB})</th>
+                                    <th>סיכוי מדויק</th>
+                                    <th>תוחלת נקודות (EV)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {topResults.map((row, index) => (
+                                    <tr key={index} className={index === 0 ? 'optimal-row' : ''}>
+                                        <td>
+                                            <span dir="ltr">{row.score}</span>
+                                            {index === 0 && <span className="badge">אופטימלי!</span>}
+                                            <div style={{fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px'}}>
+                                                <MathFormula expr={`EV = (${row.pExact.toFixed(4)}) \\times ${ptsScore} + ((${row.pDirection.toFixed(4)}) - (${row.pExact.toFixed(4)})) \\times ${ptsOutcome}`} />
+                                            </div>
+                                        </td>
+                                        <td style={{fontVariantNumeric: 'tabular-nums'}}>{(row.pExact * 100).toFixed(2)}%</td>
+                                        <td style={{fontVariantNumeric: 'tabular-nums'}}>
+                                            {row.ev.toFixed(4)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
                     <div className="card form-group">
                         <h2>התפלגות שערים חזויה</h2>
                         {mode === 'poisson' ? (
@@ -668,7 +702,7 @@ function SimulatorApp() {
                                 <table style={{width: '100%', fontSize: '0.85rem', textAlign: 'right'}}>
                                     <thead>
                                         <tr style={{backgroundColor: '#f1f5f9', borderBottom: '2px solid var(--border)'}}>
-                                            <th style={{padding: '10px', fontWeight: '700', color: '#334155'}}>תוצאה (א' - ב')</th>
+                                            <th style={{padding: '10px', fontWeight: '700', color: '#334155'}}>תוצאה ({teamNameA} - {teamNameB})</th>
                                             <th style={{padding: '10px', fontWeight: '700', color: '#334155'}}>הסתברות</th>
                                             <th style={{padding: '10px', fontWeight: '700', color: '#334155'}}>תוצאה</th>
                                         </tr>
@@ -689,7 +723,7 @@ function SimulatorApp() {
                                             }
                                             return (
                                                 <tr key={index} style={{borderBottom: '1px solid var(--border)'}}>
-                                                    <td style={{padding: '10px'}}>{row.score}</td>
+                                                    <td style={{padding: '10px'}} dir="ltr">{row.score}</td>
                                                     <td style={{padding: '10px', fontVariantNumeric: 'tabular-nums'}}>
                                                         {(row.pExact * 100).toFixed(3)}%
                                                         <div dir="ltr" style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', textAlign: 'left'}}>
@@ -704,40 +738,6 @@ function SimulatorApp() {
                                 </table>
                             </>
                         )}
-                    </div>
-
-                    <div className="card">
-                        <h2>דירוג תוחלת ערך (EV Optimization)</h2>
-                        <div style={{fontSize: '0.95rem', color: 'var(--text-muted)', marginTop: '0'}}>
-                            <MathFormula expr={"EV = P(exact) \\times exactPoints + (P(direction) - P(exact)) \\times outcomePoints"} />
-                        </div>
-                        
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>תוצאה (א' - ב')</th>
-                                    <th>סיכוי מדויק</th>
-                                    <th>תוחלת נקודות (EV)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {topResults.map((row, index) => (
-                                    <tr key={index} className={index === 0 ? 'optimal-row' : ''}>
-                                        <td>
-                                            {row.score}
-                                            {index === 0 && <span className="badge">אופטימלי!</span>}
-                                            <div style={{fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px'}}>
-                                                <MathFormula expr={`EV = (${row.pExact.toFixed(4)}) \\times ${ptsScore} + ((${row.pDirection.toFixed(4)}) - (${row.pExact.toFixed(4)})) \\times ${ptsOutcome}`} />
-                                            </div>
-                                        </td>
-                                        <td style={{fontVariantNumeric: 'tabular-nums'}}>{(row.pExact * 100).toFixed(2)}%</td>
-                                        <td style={{fontVariantNumeric: 'tabular-nums'}}>
-                                            {row.ev.toFixed(4)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>
