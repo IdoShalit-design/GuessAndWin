@@ -1,5 +1,5 @@
 const { useState } = React;
-const { importPolymarketGame } = window.PolymarketImporter;
+const { importPolymarketGame, importNextPolymarketGame } = window.PolymarketImporter;
 
 function MathFormula({ expr, displayMode = false, style = {} }) {
     return (
@@ -217,6 +217,7 @@ function SimulatorApp() {
                 fitLambdasFromMarkets,
                 getOversFromLambda,
             });
+            setPolymarketUrl(importedData.polymarketUrl);
             setTeamNameA(importedData.teamNameA);
             setTeamNameB(importedData.teamNameB);
             setRawWinA(importedData.rawWinA);
@@ -231,6 +232,39 @@ function SimulatorApp() {
             setImportStatus(importedData.statusMessage);
         } catch (error) {
             setImportError(error.message || 'הייבוא מ-Polymarket נכשל.');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
+    const importNextGameFromPolymarket = async () => {
+        setImportError('');
+        setImportStatus('');
+
+        setIsImporting(true);
+
+        try {
+            const importedData = await importNextPolymarketGame({
+                normalizeProbabilities,
+                clampPercent,
+                fitLambdasFromMarkets,
+                getOversFromLambda,
+            });
+            setPolymarketUrl(importedData.polymarketUrl);
+            setTeamNameA(importedData.teamNameA);
+            setTeamNameB(importedData.teamNameB);
+            setRawWinA(importedData.rawWinA);
+            setRawDraw(importedData.rawDraw);
+            setRawWinB(importedData.rawWinB);
+            setPOver05A(importedData.pOver05A);
+            setPOver15A(importedData.pOver15A);
+            setPOver25A(importedData.pOver25A);
+            setPOver05B(importedData.pOver05B);
+            setPOver15B(importedData.pOver15B);
+            setPOver25B(importedData.pOver25B);
+            setImportStatus(importedData.statusMessage);
+        } catch (error) {
+            setImportError(error.message || 'טעינת המשחק הקרוב מ-Polymarket נכשלה.');
         } finally {
             setIsImporting(false);
         }
@@ -386,6 +420,14 @@ function SimulatorApp() {
                                     style={{opacity: isImporting ? 0.7 : 1, minWidth: '140px'}}
                                 >
                                     {isImporting ? 'טוען...' : 'ייבוא אוטומטי'}
+                                </button>
+                                <button
+                                    className="copy-btn"
+                                    onClick={importNextGameFromPolymarket}
+                                    disabled={isImporting}
+                                    style={{opacity: isImporting ? 0.7 : 1, minWidth: '160px'}}
+                                >
+                                    {isImporting ? 'טוען...' : 'הבא משחק קרוב'}
                                 </button>
                             </div>
                             <p style={{fontSize: '0.82rem', color: 'var(--text-muted)', margin: '8px 0 0 0'}}>
