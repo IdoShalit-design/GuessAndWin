@@ -170,7 +170,7 @@ function getOversFromLambda(lambda) {
 
 function SimulatorApp() {
     // מודל: 'poisson' או 'empirical'
-    const [mode, setMode] = useState('poisson'); 
+    const [mode, setMode] = useState('empirical'); 
 
     // הרחבה/כיווץ סדרתים
     const [expandOutcomeProbs, setExpandOutcomeProbs] = useState(false);
