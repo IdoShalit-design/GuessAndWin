@@ -539,16 +539,6 @@ function SimulatorApp() {
                             </div>
                         </div>
                     </div>
-                    <div className="card">
-                        <h2>סיכום קלטים (להעתקה)</h2>
-                        <div className="form-group">
-                            <label>העתק את כל הקלטים כאן:</label>
-                            <textarea className="summary-textarea" readOnly rows={8} value={summaryText} />
-                            <div style={{marginTop: '8px'}}>
-                                <button className="copy-btn" onClick={() => navigator.clipboard && navigator.clipboard.writeText(summaryText)}>העתק</button>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {/* עמודה שמאלית: תוצאות ואנליטיקה */}
@@ -738,6 +728,16 @@ function SimulatorApp() {
                                 </table>
                             </>
                         )}
+                    </div>
+                </div>
+            </div>
+            <div className="card">
+                <h2>סיכום קלטים (להעתקה)</h2>
+                <div className="form-group">
+                    <label>העתק את כל הקלטים כאן:</label>
+                    <textarea className="summary-textarea" readOnly rows={8} value={summaryText} />
+                    <div style={{marginTop: '8px'}}>
+                        <button className="copy-btn" onClick={() => navigator.clipboard && navigator.clipboard.writeText(summaryText)}>העתק</button>
                     </div>
                 </div>
             </div>
