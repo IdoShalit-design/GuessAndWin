@@ -230,7 +230,26 @@ async function importNextPolymarketGame(helpers) {
     };
 }
 
+async function importPrevPolymarketGame(helpers) {
+    const upcomingGames = await getUpcomingCompatibleGames();
+    if (!upcomingGames.length) {
+        throw new Error('לא נמצאו כרגע משחקי כדורגל קרובים תואמים ב-Polymarket.');
+    }
+
+    // Undo the last +1 increment, then step back one more
+    nextGameCursor = ((nextGameCursor - 2) % upcomingGames.length + upcomingGames.length) % upcomingGames.length;
+    const selectedEvent = upcomingGames[nextGameCursor];
+    nextGameCursor += 1;
+
+    const importedData = await importPolymarketGame(`https://polymarket.com/event/${selectedEvent.slug}`, helpers);
+    return {
+        ...importedData,
+        statusMessage: `נטען המשחק הקודם: ${selectedEvent.title}. לחיצה על הבא/הקודם תנווט בין המשחקים.`,
+    };
+}
+
 window.PolymarketImporter = {
     importPolymarketGame,
     importNextPolymarketGame,
+    importPrevPolymarketGame,
 };

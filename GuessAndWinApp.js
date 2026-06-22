@@ -1,5 +1,5 @@
 const { useState } = React;
-const { importPolymarketGame, importNextPolymarketGame } = window.PolymarketImporter;
+const { importPolymarketGame, importNextPolymarketGame, importPrevPolymarketGame } = window.PolymarketImporter;
 
 function MathFormula({ expr, displayMode = false, style = {} }) {
     return (
@@ -270,6 +270,39 @@ function SimulatorApp() {
         }
     };
 
+    const importPrevGameFromPolymarket = async () => {
+        setImportError('');
+        setImportStatus('');
+
+        setIsImporting(true);
+
+        try {
+            const importedData = await importPrevPolymarketGame({
+                normalizeProbabilities,
+                clampPercent,
+                fitLambdasFromMarkets,
+                getOversFromLambda,
+            });
+            setPolymarketUrl(importedData.polymarketUrl);
+            setTeamNameA(importedData.teamNameA);
+            setTeamNameB(importedData.teamNameB);
+            setRawWinA(importedData.rawWinA);
+            setRawDraw(importedData.rawDraw);
+            setRawWinB(importedData.rawWinB);
+            setPOver05A(importedData.pOver05A);
+            setPOver15A(importedData.pOver15A);
+            setPOver25A(importedData.pOver25A);
+            setPOver05B(importedData.pOver05B);
+            setPOver15B(importedData.pOver15B);
+            setPOver25B(importedData.pOver25B);
+            setImportStatus(importedData.statusMessage);
+        } catch (error) {
+            setImportError(error.message || 'טעינת המשחק הקודם מ-Polymarket נכשלה.');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
     // נרמול שוק 1X2
     const totalRaw = rawWinA + rawDraw + rawWinB;
     const normWinA = rawWinA / totalRaw;
@@ -427,9 +460,15 @@ function SimulatorApp() {
                                     disabled={isImporting}
                                     style={{opacity: isImporting ? 0.7 : 1, minWidth: '160px'}}
                                 >
-                                    {isImporting ? 'טוען...' : 'הבא משחק קרוב'}
-                                </button>
-                            </div>
+                                    {isImporting ? 'טוען...' : 'הבא משחק הבא'}
+                                </button>                                <button
+                                    className="copy-btn"
+                                    onClick={importPrevGameFromPolymarket}
+                                    disabled={isImporting}
+                                    style={{opacity: isImporting ? 0.7 : 1, minWidth: '160px'}}
+                                >
+                                    {isImporting ? 'טוען...' : 'משחק קודם'}
+                                </button>                            </div>
                             <p style={{fontSize: '0.82rem', color: 'var(--text-muted)', margin: '8px 0 0 0'}}>
                                 הייבוא משתמש ב-Gamma API של Polymarket כדי למשוך את שמות הקבוצות, שוק ה-1X2 ושוק התוצאה המדויקת.
                             </p>
