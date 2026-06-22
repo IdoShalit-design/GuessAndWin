@@ -1,4 +1,5 @@
 const { useState } = React;
+const { importPolymarketGame } = window.PolymarketImporter;
 
 function MathFormula({ expr, displayMode = false, style = {} }) {
     return (
@@ -82,9 +83,42 @@ function SimulatorApp() {
     const [teamNameA, setTeamNameA] = useState('קבוצה א');
     const [teamNameB, setTeamNameB] = useState('קבוצה ב');
 
+    // ייבוא מ-Polymarket
+    const [polymarketUrl, setPolymarketUrl] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
+    const [importStatus, setImportStatus] = useState('');
+    const [importError, setImportError] = useState('');
+
     // ניקוד
     const [ptsOutcome, setPtsOutcome] = useState(1);
     const [ptsScore, setPtsScore] = useState(3);
+
+    const importFromPolymarket = async () => {
+        setImportError('');
+        setImportStatus('');
+
+        setIsImporting(true);
+
+        try {
+            const importedData = await importPolymarketGame(polymarketUrl);
+            setTeamNameA(importedData.teamNameA);
+            setTeamNameB(importedData.teamNameB);
+            setRawWinA(importedData.rawWinA);
+            setRawDraw(importedData.rawDraw);
+            setRawWinB(importedData.rawWinB);
+            setPOver05A(importedData.pOver05A);
+            setPOver15A(importedData.pOver15A);
+            setPOver25A(importedData.pOver25A);
+            setPOver05B(importedData.pOver05B);
+            setPOver15B(importedData.pOver15B);
+            setPOver25B(importedData.pOver25B);
+            setImportStatus(importedData.statusMessage);
+        } catch (error) {
+            setImportError(error.message || 'הייבוא מ-Polymarket נכשל.');
+        } finally {
+            setIsImporting(false);
+        }
+    };
 
     // נרמול שוק 1X2
     const totalRaw = rawWinA + rawDraw + rawWinB;
@@ -218,6 +252,40 @@ function SimulatorApp() {
                                 />
                             </div>
                         </div>
+                        <div style={{marginTop: '18px', paddingTop: '18px', borderTop: '1px solid var(--border)'}}>
+                            <label style={{fontSize: '0.9rem', marginBottom: '6px', display: 'block'}}>קישור למשחק ב-Polymarket:</label>
+                            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+                                <input
+                                    type="url"
+                                    className="points-input"
+                                    value={polymarketUrl}
+                                    onChange={(e) => setPolymarketUrl(e.target.value)}
+                                    placeholder="https://polymarket.com/sports/world-cup/..."
+                                    style={{flex: 1, minWidth: '260px', fontSize: '0.9rem', padding: '8px 10px'}}
+                                />
+                                <button
+                                    className="copy-btn"
+                                    onClick={importFromPolymarket}
+                                    disabled={isImporting}
+                                    style={{opacity: isImporting ? 0.7 : 1, minWidth: '140px'}}
+                                >
+                                    {isImporting ? 'טוען...' : 'ייבוא אוטומטי'}
+                                </button>
+                            </div>
+                            <p style={{fontSize: '0.82rem', color: 'var(--text-muted)', margin: '8px 0 0 0'}}>
+                                הייבוא משתמש ב-Gamma API של Polymarket כדי למשוך את שמות הקבוצות, שוק ה-1X2 ושוק התוצאה המדויקת.
+                            </p>
+                            {importStatus && (
+                                <p style={{fontSize: '0.82rem', color: 'var(--success)', margin: '8px 0 0 0'}}>
+                                    {importStatus}
+                                </p>
+                            )}
+                            {importError && (
+                                <p style={{fontSize: '0.82rem', color: '#dc2626', margin: '8px 0 0 0'}}>
+                                    {importError}
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     <div className="card form-group">
@@ -225,19 +293,19 @@ function SimulatorApp() {
                         <div className="form-group">
                             <label>ניצחון {teamNameA} (מארחת):</label>
                             <div className="slider-container">
-                                <SliderWithNumber min={5} max={90} value={rawWinA} onChange={(v) => setRawWinA(v)} />
+                                <SliderWithNumber min={1} max={99} value={rawWinA} onChange={(v) => setRawWinA(v)} />
                             </div>
                         </div>
                         <div className="form-group">
                             <label>תיקו:</label>
                             <div className="slider-container">
-                                <SliderWithNumber min={5} max={90} value={rawDraw} onChange={(v) => setRawDraw(v)} />
+                                <SliderWithNumber min={1} max={99} value={rawDraw} onChange={(v) => setRawDraw(v)} />
                             </div>
                         </div>
                         <div className="form-group">
                             <label>ניצחון {teamNameB} (אורחת):</label>
                             <div className="slider-container">
-                                <SliderWithNumber min={5} max={90} value={rawWinB} onChange={(v) => setRawWinB(v)} />
+                                <SliderWithNumber min={1} max={99} value={rawWinB} onChange={(v) => setRawWinB(v)} />
                             </div>
                         </div>
                         <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', margin: '5px 0 0 0'}}>
@@ -253,7 +321,7 @@ function SimulatorApp() {
                         <div className="form-group" style={{marginBottom: mode === 'poisson' ? '15px' : '5px'}}>
                             <label>Over 0.5:</label>
                             <div className="slider-container">
-                                <SliderWithNumber min={5} max={99} value={pOver05A} onChange={(v) => setPOver05A(v)} />
+                                <SliderWithNumber min={0} max={99} value={pOver05A} onChange={(v) => setPOver05A(v)} />
                             </div>
                             {mode === 'poisson' && <small style={{color: 'var(--text-muted)'}}>&lambda; צפוי: {lambdaA.toFixed(3)} שערים</small>}
                         </div>
@@ -262,13 +330,13 @@ function SimulatorApp() {
                                 <div className="form-group" style={{marginBottom: '5px'}}>
                                     <label>Over 1.5:</label>
                                     <div className="slider-container">
-                                        <SliderWithNumber min={1} max={99} value={pOver15A} onChange={(v) => setPOver15A(v)} />
+                                        <SliderWithNumber min={0} max={99} value={pOver15A} onChange={(v) => setPOver15A(v)} />
                                     </div>
                                 </div>
                                 <div className="form-group">
                                     <label>Over 2.5:</label>
                                     <div className="slider-container">
-                                        <SliderWithNumber min={0} max={80} value={pOver25A} onChange={(v) => setPOver25A(v)} />
+                                        <SliderWithNumber min={0} max={99} value={pOver25A} onChange={(v) => setPOver25A(v)} />
                                     </div>
                                 </div>
                             </>
@@ -278,7 +346,7 @@ function SimulatorApp() {
                         <div className="form-group" style={{marginBottom: mode === 'poisson' ? '15px' : '5px'}}>
                             <label>Over 0.5:</label>
                             <div className="slider-container">
-                                <SliderWithNumber min={5} max={99} value={pOver05B} onChange={(v) => setPOver05B(v)} />
+                                <SliderWithNumber min={0} max={99} value={pOver05B} onChange={(v) => setPOver05B(v)} />
                             </div>
                             {mode === 'poisson' && <small style={{color: 'var(--text-muted)'}}>&lambda; צפוי: {lambdaB.toFixed(3)} שערים</small>}
                         </div>
@@ -287,13 +355,13 @@ function SimulatorApp() {
                                 <div className="form-group" style={{marginBottom: '5px'}}>
                                     <label>Over 1.5:</label>
                                     <div className="slider-container">
-                                        <SliderWithNumber min={1} max={99} value={pOver15B} onChange={(v) => setPOver15B(v)} />
+                                        <SliderWithNumber min={0} max={99} value={pOver15B} onChange={(v) => setPOver15B(v)} />
                                     </div>
                                 </div>
                                 <div className="form-group">
                                     <label>Over 2.5:</label>
                                     <div className="slider-container">
-                                        <SliderWithNumber min={0} max={80} value={pOver25B} onChange={(v) => setPOver25B(v)} />
+                                        <SliderWithNumber min={0} max={99} value={pOver25B} onChange={(v) => setPOver25B(v)} />
                                     </div>
                                 </div>
                             </>
