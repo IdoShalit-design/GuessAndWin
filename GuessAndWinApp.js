@@ -70,6 +70,38 @@ function clampPercent(probability) {
     return Math.max(0, Math.min(99, Math.round(probability * 100)));
 }
 
+// Splits the empirical P(3+) bucket into individual goal counts (3,4,5,...maxGoals)
+// using a conditional Poisson distribution parameterised by lambda.
+// Returns an array [P(0), P(1), P(2), P(3), P(4), ..., P(maxGoals)].
+function buildEmpiricalDist(emp05, emp15, emp25, lambda, maxGoals = 6) {
+    const dist = [];
+    dist.push(1 - emp05);       // P(0) — empirical
+    dist.push(emp05 - emp15);   // P(1) — empirical
+    dist.push(emp15 - emp25);   // P(2) — empirical
+
+    // Compute Poisson tail mass for k >= 3 up to a large cap
+    let poissonTailTotal = 0;
+    for (let k = 3; k <= 20; k++) poissonTailTotal += poissonProb(k, lambda);
+    if (poissonTailTotal <= 0) poissonTailTotal = 1; // guard
+
+    // Distribute emp25 proportionally using conditional Poisson for k = 3..maxGoals
+    // Any residual (k > maxGoals) is added to the last bucket.
+    for (let k = 3; k <= maxGoals; k++) {
+        let weight;
+        if (k < maxGoals) {
+            weight = poissonProb(k, lambda) / poissonTailTotal;
+        } else {
+            // Last bucket absorbs remaining tail mass
+            let usedWeight = 0;
+            for (let j = 3; j < maxGoals; j++) usedWeight += poissonProb(j, lambda) / poissonTailTotal;
+            weight = 1 - usedWeight;
+        }
+        dist.push(emp25 * weight);
+    }
+
+    return dist;
+}
+
 function computeMoneylineFromLambdas(lambdaA, lambdaB, maxGoals = 15) {
     let home = 0;
     let draw = 0;
@@ -334,9 +366,10 @@ function SimulatorApp() {
     const emp25B = Math.min(pOver25B / 100, emp15B);
 
     // יצירת מערכי ההתפלגות לפי המודל הנבחר
+    const empiricalMaxGoals = 6;
+    const currentMaxGoals = mode === 'poisson' ? 5 : empiricalMaxGoals;
     const distA = [];
     const distB = [];
-    const currentMaxGoals = mode === 'poisson' ? 5 : 3;
 
     if (mode === 'poisson') {
         for (let g = 0; g <= currentMaxGoals; g++) {
@@ -344,16 +377,9 @@ function SimulatorApp() {
             distB.push(poissonProb(g, lambdaB));
         }
     } else {
-        // מודל אמפירי
-        distA.push(1 - emp05A);       // 0 שערים
-        distA.push(emp05A - emp15A);  // 1 שער
-        distA.push(emp15A - emp25A);  // 2 שערים
-        distA.push(emp25A);           // 3+ שערים
-
-        distB.push(1 - emp05B);
-        distB.push(emp05B - emp15B);
-        distB.push(emp15B - emp25B);
-        distB.push(emp25B);
+        // מודל אמפירי: 0-2 ישירות מהשוק, 3-6 מחולקים לפי פואסון מותנה
+        buildEmpiricalDist(emp05A, emp15A, emp25A, lambdaA, empiricalMaxGoals).forEach(p => distA.push(p));
+        buildEmpiricalDist(emp05B, emp15B, emp25B, lambdaB, empiricalMaxGoals).forEach(p => distB.push(p));
     }
 
     // חישוב מטריצת התוצאות וה-EV
@@ -368,9 +394,9 @@ function SimulatorApp() {
 
             const ev = (pExact * ptsScore) + ((pDirection - pExact) * ptsOutcome);
 
-            // במודל אמפירי, התוצאה הגבוהה ביותר מייצגת 3+
-            const labelA = (mode === 'empirical' && gA === currentMaxGoals) ? '3+' : gA;
-            const labelB = (mode === 'empirical' && gB === currentMaxGoals) ? '3+' : gB;
+            // במודל אמפירי, התוצאה הגבוהה ביותר מייצגת 6+
+            const labelA = (mode === 'empirical' && gA === currentMaxGoals) ? '6+' : gA;
+            const labelB = (mode === 'empirical' && gB === currentMaxGoals) ? '6+' : gB;
 
             resultsMatrix.push({
                 score: `${labelA} - ${labelB}`,
@@ -633,7 +659,7 @@ function SimulatorApp() {
                         <h3>{teamNameA} (מארחת)</h3>
                         {distA.slice(0, currentMaxGoals + 1).map((p, idx) => {
                             const isMax = (mode === 'empirical' && idx === currentMaxGoals);
-                            const label = isMax ? '3+' : idx;
+                            const label = isMax ? '6+' : idx;
                             return (
                                 <div key={'a'+idx} style={{marginBottom: '14px'}}>
                                     <div className="dist-row" style={{marginBottom: '4px'}}>
@@ -650,7 +676,8 @@ function SimulatorApp() {
                                             idx === 0 ? <MathFormula expr={`P(0) = 100\\% - O0.5 = ${(p*100).toFixed(1)}\\%`} /> :
                                             idx === 1 ? <MathFormula expr={`P(1) = O0.5 - O1.5 = ${(p*100).toFixed(1)}\\%`} /> :
                                             idx === 2 ? <MathFormula expr={`P(2) = O1.5 - O2.5 = ${(p*100).toFixed(1)}\\%`} /> :
-                                            <MathFormula expr={`P(3+) = O2.5 = ${(p*100).toFixed(1)}\\%`} />
+                                            isMax ? <MathFormula expr={`P(6+) = O2.5 \\times w_{6+}(\\lambda) = ${(p*100).toFixed(1)}\\%`} /> :
+                                            <MathFormula expr={`P(${idx}) = O2.5 \\times w_{${idx}}(\\lambda) = ${(p*100).toFixed(1)}\\%`} />
                                         )}
                                     </div>
                                 </div>
@@ -660,7 +687,7 @@ function SimulatorApp() {
                         <h3 style={{marginTop: '25px'}}>{teamNameB} (אורחת)</h3>
                         {distB.slice(0, currentMaxGoals + 1).map((p, idx) => {
                             const isMax = (mode === 'empirical' && idx === currentMaxGoals);
-                            const label = isMax ? '3+' : idx;
+                            const label = isMax ? '6+' : idx;
                             return (
                                 <div key={'b'+idx} style={{marginBottom: '14px'}}>
                                     <div className="dist-row" style={{marginBottom: '4px'}}>
@@ -677,7 +704,8 @@ function SimulatorApp() {
                                             idx === 0 ? <MathFormula expr={`P(0) = 100\\% - O0.5 = ${(p*100).toFixed(1)}\\%`} /> :
                                             idx === 1 ? <MathFormula expr={`P(1) = O0.5 - O1.5 = ${(p*100).toFixed(1)}\\%`} /> :
                                             idx === 2 ? <MathFormula expr={`P(2) = O1.5 - O2.5 = ${(p*100).toFixed(1)}\\%`} /> :
-                                            <MathFormula expr={`P(3+) = O2.5 = ${(p*100).toFixed(1)}\\%`} />
+                                            isMax ? <MathFormula expr={`P(6+) = O2.5 \\times w_{6+}(\\lambda) = ${(p*100).toFixed(1)}\\%`} /> :
+                                            <MathFormula expr={`P(${idx}) = O2.5 \\times w_{${idx}}(\\lambda) = ${(p*100).toFixed(1)}\\%`} />
                                         )}
                                     </div>
                                 </div>
