@@ -70,6 +70,36 @@ function clampPercent(probability) {
     return Math.max(0, Math.min(99, Math.round(probability * 100)));
 }
 
+// Fits a single Poisson lambda by minimising MSE against all three over markets:
+//   L(λ) = [P(X≥1|λ) − emp05]² + [P(X≥2|λ) − emp15]² + [P(X≥3|λ) − emp25]²
+// where P(X≥k|λ) = 1 − e^{−λ} Σ_{j=0}^{k−1} λ^j / j!
+function fitLambdaFromOvers(emp05, emp15, emp25) {
+    const loss = (lam) => {
+        const e = Math.exp(-lam);
+        const p0 = e;
+        const p1 = lam * e;
+        const p2 = (lam * lam / 2) * e;
+        return Math.pow((1 - p0)         - emp05, 2)   // P(X≥1) vs O0.5
+             + Math.pow((1 - p0 - p1)    - emp15, 2)   // P(X≥2) vs O1.5
+             + Math.pow((1 - p0 - p1 - p2) - emp25, 2); // P(X≥3) vs O2.5
+    };
+
+    // Coarse sweep λ ∈ [0.05, 5] step 0.05
+    let best = { lam: 0.05, loss: Infinity };
+    for (let lam = 0.05; lam <= 5; lam += 0.05) {
+        const l = loss(lam);
+        if (l < best.loss) best = { lam, loss: l };
+    }
+
+    // Fine sweep ±0.1 around best, step 0.001
+    for (let lam = Math.max(0.001, best.lam - 0.1); lam <= best.lam + 0.1; lam += 0.001) {
+        const l = loss(lam);
+        if (l < best.loss) best = { lam, loss: l };
+    }
+
+    return best.lam;
+}
+
 // Splits the empirical P(3+) bucket into individual goal counts (3,4,5,...maxGoals)
 // using a conditional Poisson distribution parameterised by lambda.
 // Returns an array [P(0), P(1), P(2), P(3), P(4), ..., P(maxGoals)].
@@ -345,17 +375,6 @@ function SimulatorApp() {
     const lambdaA = -Math.log(1 - (pOver05A / 100));
     const lambdaB = -Math.log(1 - (pOver05B / 100));
 
-    // סיכום קלטים לטקסט שניתן להעתיק
-    const summaryText = [
-        `Model: ${mode}`,
-        `Raw 1X2: A=${rawWinA}% | Draw=${rawDraw}% | B=${rawWinB}%`,
-        `Normalized 1X2: A=${(normWinA*100).toFixed(2)}% | Draw=${(normDraw*100).toFixed(2)}% | B=${(normWinB*100).toFixed(2)}%`,
-        `Team A Overs: O0.5=${pOver05A}%${mode === 'empirical' ? ` | O1.5=${pOver15A}% | O2.5=${pOver25A}%` : ''}`,
-        `Team B Overs: O0.5=${pOver05B}%${mode === 'empirical' ? ` | O1.5=${pOver15B}% | O2.5=${pOver25B}%` : ''}`,
-        `Points: outcome=${ptsOutcome} | exact=${ptsScore}`,
-        `Lambda (A) = ${lambdaA.toFixed(3)} | Lambda (B) = ${lambdaB.toFixed(3)}`
-    ].join('\n');
-
     // חישובי שוק אמפירי - הבטחת תקינות מתמטית (O0.5 >= O1.5 >= O2.5)
     const emp05A = pOver05A / 100;
     const emp15A = Math.min(pOver15A / 100, emp05A);
@@ -364,6 +383,28 @@ function SimulatorApp() {
     const emp05B = pOver05B / 100;
     const emp15B = Math.min(pOver15B / 100, emp05B);
     const emp25B = Math.min(pOver25B / 100, emp15B);
+
+    // פיטינג λ: במודל אמפירי — מכוון לכל שלושת שווקי ה-Over במינימיזציה של MSE
+    //            במודל פואסון — נגזר מ-O0.5 בלבד (מודל נאיבי מכוון)
+    const lambdaAFitted = mode === 'empirical'
+        ? fitLambdaFromOvers(emp05A, emp15A, emp25A)
+        : lambdaA;
+    const lambdaBFitted = mode === 'empirical'
+        ? fitLambdaFromOvers(emp05B, emp15B, emp25B)
+        : lambdaB;
+
+    // סיכום קלטים לטקסט שניתן להעתיק
+    const summaryText = [
+        `Model: ${mode}`,
+        `Raw 1X2: A=${rawWinA}% | Draw=${rawDraw}% | B=${rawWinB}%`,
+        `Normalized 1X2: A=${(normWinA*100).toFixed(2)}% | Draw=${(normDraw*100).toFixed(2)}% | B=${(normWinB*100).toFixed(2)}%`,
+        `Team A Overs: O0.5=${pOver05A}%${mode === 'empirical' ? ` | O1.5=${pOver15A}% | O2.5=${pOver25A}%` : ''}`,
+        `Team B Overs: O0.5=${pOver05B}%${mode === 'empirical' ? ` | O1.5=${pOver15B}% | O2.5=${pOver25B}%` : ''}`,
+        `Points: outcome=${ptsOutcome} | exact=${ptsScore}`,
+        mode === 'empirical'
+            ? `Lambda fitted (A) = ${lambdaAFitted.toFixed(3)} | Lambda fitted (B) = ${lambdaBFitted.toFixed(3)}`
+            : `Lambda O0.5 (A) = ${lambdaA.toFixed(3)} | Lambda O0.5 (B) = ${lambdaB.toFixed(3)}`
+    ].join('\n');
 
     // יצירת מערכי ההתפלגות לפי המודל הנבחר
     const empiricalMaxGoals = 6;
@@ -377,9 +418,9 @@ function SimulatorApp() {
             distB.push(poissonProb(g, lambdaB));
         }
     } else {
-        // מודל אמפירי: 0-2 ישירות מהשוק, 3-6 מחולקים לפי פואסון מותנה
-        buildEmpiricalDist(emp05A, emp15A, emp25A, lambdaA, empiricalMaxGoals).forEach(p => distA.push(p));
-        buildEmpiricalDist(emp05B, emp15B, emp25B, lambdaB, empiricalMaxGoals).forEach(p => distB.push(p));
+        // מודל אמפירי: 0-2 ישירות מהשוק, 3-6 מחולקים לפי פואסון מותנה (λ מכוון לכל 3 שווקים)
+        buildEmpiricalDist(emp05A, emp15A, emp25A, lambdaAFitted, empiricalMaxGoals).forEach(p => distA.push(p));
+        buildEmpiricalDist(emp05B, emp15B, emp25B, lambdaBFitted, empiricalMaxGoals).forEach(p => distB.push(p));
     }
 
     // חישוב מטריצת התוצאות וה-EV
@@ -547,6 +588,7 @@ function SimulatorApp() {
                                 <SliderWithNumber min={0} max={99} value={pOver05A} onChange={(v) => setPOver05A(v)} />
                             </div>
                             {mode === 'poisson' && <small style={{color: 'var(--text-muted)'}}>&lambda; צפוי: {lambdaA.toFixed(3)} שערים</small>}
+                            {mode === 'empirical' && <small style={{color: 'var(--text-muted)'}}>&lambda; מכוון (O0.5+O1.5+O2.5): {lambdaAFitted.toFixed(3)}</small>}
                         </div>
                         {mode === 'empirical' && (
                             <>
@@ -572,6 +614,7 @@ function SimulatorApp() {
                                 <SliderWithNumber min={0} max={99} value={pOver05B} onChange={(v) => setPOver05B(v)} />
                             </div>
                             {mode === 'poisson' && <small style={{color: 'var(--text-muted)'}}>&lambda; צפוי: {lambdaB.toFixed(3)} שערים</small>}
+                            {mode === 'empirical' && <small style={{color: 'var(--text-muted)'}}>&lambda; מכוון (O0.5+O1.5+O2.5): {lambdaBFitted.toFixed(3)}</small>}
                         </div>
                         {mode === 'empirical' && (
                             <>
