@@ -14,7 +14,7 @@ function normalizeText(value) {
     return (value || '').toLowerCase();
 }
 
-const NEXT_GAME_EVENTS_URL = 'https://gamma-api.polymarket.com/events?active=true&closed=false&order=start_date&ascending=true&limit=500&tag_id=102232&related_tags=true';
+const NEXT_GAME_EVENTS_URL = 'https://gamma-api.polymarket.com/events?active=true&closed=false&order=start_date&ascending=true&limit=100&tag_id=102232&related_tags=true';
 let cachedNextGames = null;
 let nextGameCursor = 0;
 
@@ -121,17 +121,31 @@ function isCompatibleBaseEvent(event, exactScoreSlugs, nowTimestamp) {
 }
 
 async function getUpcomingCompatibleGames() {
-    if (cachedNextGames) return cachedNextGames;
+    if (cachedNextGames !== null) return cachedNextGames;
 
-    const events = await fetchJson(NEXT_GAME_EVENTS_URL);
+    // The Gamma API caps responses at 100 events per page regardless of the limit
+    // parameter. Match events appear after general tournament markets, so we must
+    // paginate until the API returns an empty page.
+    const allEvents = [];
+    const pageSize = 100;
+    let offset = 0;
+    while (true) {
+        const url = `${NEXT_GAME_EVENTS_URL}&offset=${offset}`;
+        const page = await fetchJson(url);
+        if (!Array.isArray(page) || page.length === 0) break;
+        allEvents.push(...page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+    }
+
     const exactScoreSlugs = new Set(
-        (events || [])
+        allEvents
             .map((event) => event.slug)
             .filter((slug) => typeof slug === 'string' && slug.endsWith('-exact-score'))
     );
     const nowTimestamp = Date.now();
 
-    cachedNextGames = (events || [])
+    cachedNextGames = allEvents
         .filter((event) => isCompatibleBaseEvent(event, exactScoreSlugs, nowTimestamp))
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
