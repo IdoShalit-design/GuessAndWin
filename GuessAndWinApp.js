@@ -310,8 +310,8 @@ function SimulatorApp() {
     const [importError, setImportError] = useState('');
 
     // ניקוד
-    const [ptsOutcome, setPtsOutcome] = useState(1);
-    const [ptsScore, setPtsScore] = useState(3);
+    const [ptsOutcome, setPtsOutcome] = useState(2);
+    const [ptsScore, setPtsScore] = useState(5);
 
     const importFromPolymarket = async () => {
         setImportError('');
