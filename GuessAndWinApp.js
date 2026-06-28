@@ -230,12 +230,59 @@ function getOversFromLambda(lambda) {
     };
 }
 
+// Builds a 120-minute score probability map by convolving 90-min draws with an
+// extra-time Poisson distribution. Non-draw 90-min scores are left unchanged.
+// etFactor: fraction of the 90-min lambda used for the 30 extra minutes (e.g. 0.30).
+function buildKnockout120Matrix(distA, distB, lambdaA, lambdaB, etFactor) {
+    const lambdaET_A = lambdaA * etFactor;
+    const lambdaET_B = lambdaB * etFactor;
+    const maxGoals90 = distA.length - 1;
+    const maxGoalsET = 3;
+
+    const etDistA = [];
+    const etDistB = [];
+    for (let g = 0; g <= maxGoalsET; g++) {
+        etDistA.push(poissonProb(g, lambdaET_A));
+        etDistB.push(poissonProb(g, lambdaET_B));
+    }
+
+    // Normalize the capped joint ET distribution so probability mass is conserved
+    const etSumA = etDistA.reduce((s, p) => s + p, 0);
+    const etSumB = etDistB.reduce((s, p) => s + p, 0);
+    const etJointSum = etSumA * etSumB;
+
+    const matrix = {};
+    for (let gA = 0; gA <= maxGoals90; gA++) {
+        for (let gB = 0; gB <= maxGoals90; gB++) {
+            const p90 = distA[gA] * distB[gB];
+            if (gA !== gB) {
+                const key = `${gA}:${gB}`;
+                matrix[key] = (matrix[key] || 0) + p90;
+            } else {
+                // Draw at 90' → spread into 120'-min scores via ET Poisson
+                for (let etA = 0; etA <= maxGoalsET; etA++) {
+                    for (let etB = 0; etB <= maxGoalsET; etB++) {
+                        const pET = (etDistA[etA] * etDistB[etB]) / etJointSum;
+                        const key = `${gA + etA}:${gB + etB}`;
+                        matrix[key] = (matrix[key] || 0) + p90 * pET;
+                    }
+                }
+            }
+        }
+    }
+    return matrix;
+}
+
 function SimulatorApp() {
     // מודל: 'poisson' או 'empirical'
     const [mode, setMode] = useState('empirical'); 
 
     // הרחבה/כיווץ סדרתים
     const [expandOutcomeProbs, setExpandOutcomeProbs] = useState(false);
+
+    // מצב נוקאאוט
+    const [knockoutMode, setKnockoutMode] = useState(false);
+    const [etFactor, setEtFactor] = useState(30);
 
     // שווקי שערים - קבוצה א
     const [pOver05A, setPOver05A] = useState(80);
@@ -393,19 +440,6 @@ function SimulatorApp() {
         ? fitLambdaFromOvers(emp05B, emp15B, emp25B)
         : lambdaB;
 
-    // סיכום קלטים לטקסט שניתן להעתיק
-    const summaryText = [
-        `Model: ${mode}`,
-        `Raw 1X2: A=${rawWinA}% | Draw=${rawDraw}% | B=${rawWinB}%`,
-        `Normalized 1X2: A=${(normWinA*100).toFixed(2)}% | Draw=${(normDraw*100).toFixed(2)}% | B=${(normWinB*100).toFixed(2)}%`,
-        `Team A Overs: O0.5=${pOver05A}%${mode === 'empirical' ? ` | O1.5=${pOver15A}% | O2.5=${pOver25A}%` : ''}`,
-        `Team B Overs: O0.5=${pOver05B}%${mode === 'empirical' ? ` | O1.5=${pOver15B}% | O2.5=${pOver25B}%` : ''}`,
-        `Points: outcome=${ptsOutcome} | exact=${ptsScore}`,
-        mode === 'empirical'
-            ? `Lambda fitted (A) = ${lambdaAFitted.toFixed(3)} | Lambda fitted (B) = ${lambdaBFitted.toFixed(3)}`
-            : `Lambda O0.5 (A) = ${lambdaA.toFixed(3)} | Lambda O0.5 (B) = ${lambdaB.toFixed(3)}`
-    ].join('\n');
-
     // יצירת מערכי ההתפלגות לפי המודל הנבחר
     const empiricalMaxGoals = 6;
     const currentMaxGoals = mode === 'poisson' ? 5 : empiricalMaxGoals;
@@ -423,28 +457,74 @@ function SimulatorApp() {
         buildEmpiricalDist(emp05B, emp15B, emp25B, lambdaBFitted, empiricalMaxGoals).forEach(p => distB.push(p));
     }
 
+    // חישובי מצב נוקאאוט — מטריצת תוצאות לאחר 120 דקות
+    const etFactorDecimal = etFactor / 100;
+    const matrix120 = knockoutMode
+        ? buildKnockout120Matrix(distA, distB, lambdaAFitted, lambdaBFitted, etFactorDecimal)
+        : null;
+
+    let normWinA120 = normWinA, normDraw120 = normDraw, normWinB120 = normWinB;
+    if (knockoutMode && matrix120) {
+        let winA120 = 0, draw120 = 0, winB120 = 0;
+        for (const [key, prob] of Object.entries(matrix120)) {
+            const [gA, gB] = key.split(':').map(Number);
+            if (gA > gB) winA120 += prob;
+            else if (gB > gA) winB120 += prob;
+            else draw120 += prob;
+        }
+        const total120 = winA120 + draw120 + winB120;
+        normWinA120 = winA120 / total120;
+        normDraw120 = draw120 / total120;
+        normWinB120 = winB120 / total120;
+    }
+
+    // סיכום קלטים לטקסט שניתן להעתיק
+    const summaryText = [
+        `Model: ${mode}${knockoutMode ? ` | Knockout Mode ON (ET: ${etFactor}%)` : ''}`,
+        `Raw 1X2: A=${rawWinA}% | Draw=${rawDraw}% | B=${rawWinB}%`,
+        `Normalized 1X2 (90'): A=${(normWinA*100).toFixed(2)}% | Draw=${(normDraw*100).toFixed(2)}% | B=${(normWinB*100).toFixed(2)}%`,
+        knockoutMode ? `Knockout 120' 1X2: A=${(normWinA120*100).toFixed(2)}% | Draw=${(normDraw120*100).toFixed(2)}% | B=${(normWinB120*100).toFixed(2)}%` : null,
+        `Team A Overs: O0.5=${pOver05A}%${mode === 'empirical' ? ` | O1.5=${pOver15A}% | O2.5=${pOver25A}%` : ''}`,
+        `Team B Overs: O0.5=${pOver05B}%${mode === 'empirical' ? ` | O1.5=${pOver15B}% | O2.5=${pOver25B}%` : ''}`,
+        `Points: outcome=${ptsOutcome} | exact=${ptsScore}`,
+        mode === 'empirical'
+            ? `Lambda fitted (A) = ${lambdaAFitted.toFixed(3)} | Lambda fitted (B) = ${lambdaBFitted.toFixed(3)}`
+            : `Lambda O0.5 (A) = ${lambdaA.toFixed(3)} | Lambda O0.5 (B) = ${lambdaB.toFixed(3)}`
+    ].filter(Boolean).join('\n');
+
     // חישוב מטריצת התוצאות וה-EV
     const resultsMatrix = [];
-    for (let gA = 0; gA <= currentMaxGoals; gA++) {
-        for (let gB = 0; gB <= currentMaxGoals; gB++) {
-            const pExact = distA[gA] * distB[gB];
-
-            let pDirection = normDraw;
-            if (gA > gB) pDirection = normWinA;
-            if (gB > gA) pDirection = normWinB;
-
+    if (knockoutMode && matrix120) {
+        for (const [key, pExact] of Object.entries(matrix120)) {
+            const [gA, gB] = key.split(':').map(Number);
+            let pDirection = normDraw120;
+            if (gA > gB) pDirection = normWinA120;
+            if (gB > gA) pDirection = normWinB120;
             const ev = (pExact * ptsScore) + ((pDirection - pExact) * ptsOutcome);
+            resultsMatrix.push({ score: `${gA} - ${gB}`, pExact, pDirection, ev });
+        }
+    } else {
+        for (let gA = 0; gA <= currentMaxGoals; gA++) {
+            for (let gB = 0; gB <= currentMaxGoals; gB++) {
+                const pExact = distA[gA] * distB[gB];
 
-            // במודל אמפירי, התוצאה הגבוהה ביותר מייצגת 6+
-            const labelA = (mode === 'empirical' && gA === currentMaxGoals) ? '6+' : gA;
-            const labelB = (mode === 'empirical' && gB === currentMaxGoals) ? '6+' : gB;
+                let pDirection = normDraw;
+                if (gA > gB) pDirection = normWinA;
+                if (gB > gA) pDirection = normWinB;
 
-            resultsMatrix.push({
-                score: `${labelA} - ${labelB}`,
-                pExact: pExact,
-                pDirection: pDirection,
-                ev: ev
-            });
+                const ev = (pExact * ptsScore) + ((pDirection - pExact) * ptsOutcome);
+
+                // במודל אמפירי, התוצאה הגבוהה ביותר מייצגת 6+
+                const labelA = (mode === 'empirical' && gA === currentMaxGoals) ? '6+' : gA;
+                const labelB = (mode === 'empirical' && gB === currentMaxGoals) ? '6+' : gB;
+
+                resultsMatrix.push({
+                    score: `${labelA} - ${labelB}`,
+                    pExact: pExact,
+                    pDirection: pDirection,
+                    ev: ev
+                });
+            }
         }
     }
 
@@ -478,6 +558,35 @@ function SimulatorApp() {
                         <p style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>
                             {mode === 'poisson' ? "מודל מתמטי נאיבי המחשב התפלגות מלאה בהתבסס על שוק ה-Over 0.5 בלבד." : "מודל חכם הנשען על חכמת ההמונים (כסף אמיתי) בשווקי ה-Over המרובים."}
                         </p>
+                        <div style={{marginTop: '15px', paddingTop: '15px', borderTop: '1px solid var(--border)'}}>
+                            <label style={{display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none'}}>
+                                <input
+                                    type="checkbox"
+                                    checked={knockoutMode}
+                                    onChange={(e) => setKnockoutMode(e.target.checked)}
+                                    style={{width: '16px', height: '16px', cursor: 'pointer', accentColor: '#d97706'}}
+                                />
+                                <span style={{fontWeight: '600', fontSize: '0.95rem'}}>מצב נוקאאוט 🏆 — תוצאה לפי 120 דקות</span>
+                            </label>
+                            {knockoutMode && (
+                                <div style={{marginTop: '12px'}}>
+                                    <p style={{fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 10px 0'}}>
+                                        תיקו ב-90 דקות עובר לזמן נוסף (עם λ מוקטן). תוצאות שאינן תיקו נשארות כפי שהן. ה-EV וסיכויי התוצאה מחושבים לפי מטריצת 120 דקות.
+                                    </p>
+                                    <div className="form-group" style={{marginBottom: 0}}>
+                                        <label style={{fontSize: '0.9rem'}}>עוצמת זמן נוסף — % מה-λ של 90 דקות:</label>
+                                        <div className="slider-container">
+                                            <SliderWithNumber min={15} max={50} value={etFactor} onChange={(v) => setEtFactor(v)} />
+                                        </div>
+                                        <small style={{color: 'var(--text-muted)'}}>
+                                            λ_ET({teamNameA}) = {lambdaAFitted.toFixed(3)} × {(etFactor/100).toFixed(2)} = <strong>{(lambdaAFitted * etFactor / 100).toFixed(3)}</strong>
+                                            &nbsp;|&nbsp;
+                                            λ_ET({teamNameB}) = {lambdaBFitted.toFixed(3)} × {(etFactor/100).toFixed(2)} = <strong>{(lambdaBFitted * etFactor / 100).toFixed(3)}</strong>
+                                        </small>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px'}}>
                             <div>
                                 <label style={{fontSize: '0.9rem', marginBottom: '6px', display: 'block'}}>שם {teamNameA === 'קבוצה א' ? 'קבוצה א\'' : 'קבוצה א'}:</label>
@@ -554,6 +663,11 @@ function SimulatorApp() {
 
                     <div className="card form-group">
                         <h2>שוק ה-1X2 (Moneyline) %</h2>
+                        {knockoutMode && (
+                            <div style={{fontSize: '0.82rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '8px 10px', marginBottom: '12px'}}>
+                                🏆 מצב נוקאאוט פעיל — ערכים אלו משקפים את שוק Polymarket (90 דקות) ומשמשים כקלט בלבד. ה-EV מחושב לפי מטריצת 120 דקות.
+                            </div>
+                        )}
                         <div className="form-group">
                             <label>ניצחון {teamNameA} (מארחת):</label>
                             <div className="slider-container">
@@ -653,6 +767,11 @@ function SimulatorApp() {
                 <div className="space-y">
                     <div className="card">
                         <h2>דירוג תוחלת ערך (EV Optimization)</h2>
+                        {knockoutMode && (
+                            <div style={{fontSize: '0.82rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '8px 10px', margin: '8px 0'}}>
+                                🏆 חישובי EV מבוססים על תוצאות אחרי 120 דקות (כולל זמן נוסף)
+                            </div>
+                        )}
                         <div style={{fontSize: '0.95rem', color: 'var(--text-muted)', marginTop: '0'}}>
                             <MathFormula expr={"EV = P(exact) \\times exactPoints + (P(direction) - P(exact)) \\times outcomePoints"} />
                         </div>
@@ -687,6 +806,11 @@ function SimulatorApp() {
 
                     <div className="card form-group">
                         <h2>התפלגות שערים חזויה</h2>
+                        {knockoutMode && (
+                            <div style={{fontSize: '0.82rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '8px 10px', margin: '0 0 10px 0'}}>
+                                🏆 מצב נוקאאוט: ההתפלגות להלן משקפת 90 דקות (קלט הבסיס לחישוב).
+                            </div>
+                        )}
                         {mode === 'poisson' ? (
                             <>
                                 <div dir="ltr" style={{fontSize: '0.95rem', color: 'var(--text-muted)', marginTop: '0', textAlign: 'left'}}>
@@ -777,21 +901,21 @@ function SimulatorApp() {
 
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: expandOutcomeProbs ? '25px' : '0'}}>
                             <div style={{padding: '15px', backgroundColor: '#f0f4ff', borderRadius: '8px', border: '1px solid #bfdbfe'}}>
-                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#1e40af', marginBottom: '5px'}}>ניצחון {teamNameA}</div>
+                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#1e40af', marginBottom: '5px'}}>ניצחון {teamNameA}{knockoutMode ? " (120')" : ''}</div>
                                 <div style={{fontSize: '1.3rem', fontWeight: '700', color: '#1e40af', fontVariantNumeric: 'tabular-nums'}}>
-                                    {(normWinA * 100).toFixed(2)}%
+                                    {((knockoutMode ? normWinA120 : normWinA) * 100).toFixed(2)}%
                                 </div>
                             </div>
                             <div style={{padding: '15px', backgroundColor: '#fef3f2', borderRadius: '8px', border: '1px solid #fecaca'}}>
-                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#b91c1c', marginBottom: '5px'}}>תיקו</div>
+                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#b91c1c', marginBottom: '5px'}}>תיקו{knockoutMode ? " (120')" : ''}</div>
                                 <div style={{fontSize: '1.3rem', fontWeight: '700', color: '#b91c1c', fontVariantNumeric: 'tabular-nums'}}>
-                                    {(normDraw * 100).toFixed(2)}%
+                                    {((knockoutMode ? normDraw120 : normDraw) * 100).toFixed(2)}%
                                 </div>
                             </div>
                             <div style={{padding: '15px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0'}}>
-                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#15803d', marginBottom: '5px'}}>ניצחון {teamNameB}</div>
+                                <div style={{fontSize: '0.9rem', fontWeight: '600', color: '#15803d', marginBottom: '5px'}}>ניצחון {teamNameB}{knockoutMode ? " (120')" : ''}</div>
                                 <div style={{fontSize: '1.3rem', fontWeight: '700', color: '#15803d', fontVariantNumeric: 'tabular-nums'}}>
-                                    {(normWinB * 100).toFixed(2)}%
+                                    {((knockoutMode ? normWinB120 : normWinB) * 100).toFixed(2)}%
                                 </div>
                             </div>
                         </div>
@@ -826,9 +950,11 @@ function SimulatorApp() {
                                                     <td style={{padding: '10px'}} dir="ltr">{row.score}</td>
                                                     <td style={{padding: '10px', fontVariantNumeric: 'tabular-nums'}}>
                                                         {(row.pExact * 100).toFixed(3)}%
+                                                        {!knockoutMode && (
                                                         <div dir="ltr" style={{fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', textAlign: 'left'}}>
                                                             <MathFormula expr={`P(${goalsA},${goalsB}) = P(${goalsA}) \\times P(${goalsB})`} />
                                                         </div>
+                                                        )}
                                                     </td>
                                                     <td style={{padding: '10px', color: outcomeColor, fontWeight: '600'}}>{outcomeType}</td>
                                                 </tr>
